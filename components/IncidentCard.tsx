@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 "use client";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -251,5 +250,3 @@ export function IncidentCard({ incident }: IncidentCardProps) {
   );
 }
 
-
->>>>>>> fd4214c (Add self assign functionality)
