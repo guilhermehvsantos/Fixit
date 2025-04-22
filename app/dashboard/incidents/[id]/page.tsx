@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useRouter, useParams } from "next/navigation"
-import Link from "next/link"
+import { useState, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
+import Link from "next/link";
 import {
   AlertCircle,
   ArrowLeft,
@@ -11,21 +11,30 @@ import {
   HelpCircle,
   Trash2,
   User,
-  XCircle,
   Calendar,
   MessageSquare,
   Tag,
   UserPlus,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Separator } from "@/components/ui/separator"
-import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -34,212 +43,163 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { getCurrentUser, getUsers } from "@/app/lib/auth"
+} from "@/components/ui/dialog";
+import { getCurrentUser } from "@/app/lib/auth";
 import {
   getIncidentById,
   updateIncident,
   deleteIncident,
   type Incident,
-  addCommentToIncident,
-} from "@/app/lib/incidents"
+} from "@/app/lib/incidents";
+import { StatusBadge } from "@/components/StatusBadge";
+import { PriorityBadge } from "@/components/PriorityBadge";
+import { StatusLabel } from "@/components/StatusLabel";
+import StatusIcon from "@/components/StatusIcon";
 
 export default function IncidentDetailsPage() {
-  const router = useRouter()
-  const params = useParams()
-  const incidentId = params.id as string
+  const router = useRouter();
+  const params = useParams();
+  const incidentId = params.id as string;
 
-  const [incident, setIncident] = useState<Incident | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
-  const [comment, setComment] = useState("")
-  const [showSuccessAlert, setShowSuccessAlert] = useState(false)
-  const [successMessage, setSuccessMessage] = useState("")
-  const [showErrorAlert, setShowErrorAlert] = useState(false)
-  const [errorMessage, setErrorMessage] = useState("")
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
-  const [technicians, setTechnicians] = useState<any[]>([])
-  const [selectedTechnician, setSelectedTechnician] = useState("")
-  const [assignDialogOpen, setAssignDialogOpen] = useState(false)
+  const [incident, setIncident] = useState<Incident | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [comment, setComment] = useState("");
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [showErrorAlert, setShowErrorAlert] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [confirmSolveOpen, setConfirmSolveOpen] = useState(false);
+  const [technicians, setTechnicians] = useState<any[]>([]);
+  const [selectedTechnician, setSelectedTechnician] = useState("");
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
 
-  const currentUser = getCurrentUser()
-  const isTechnician = currentUser?.role === "technician" || currentUser?.role === "admin"
-  const isAdmin = currentUser?.role === "admin"
-  const isOwner = incident?.createdBy.id === currentUser?.id
-  const isAssignedTechnician = incident?.assignee?.id === currentUser?.id
-  const canAssign = isAdmin || (isTechnician && !incident?.assignee)
-  const canChangeStatus = isAdmin || isAssignedTechnician
-  const canComment = isAssignedTechnician || isAdmin
+  const currentUser = getCurrentUser();
+  const isTechnician =
+    currentUser?.role === "technician" || currentUser?.role === "admin";
+  const isAdmin = currentUser?.role === "admin";
+  const isOwner = incident?.usuario?.id === currentUser?.id;
+  const isAssignedTechnician = incident?.tecnico?.id === currentUser?.id;
+  const canAssign = isAdmin || (isTechnician && !incident?.tecnico);
+  const canSolve = isAdmin || isAssignedTechnician;
+  const canComment =
+    isAssignedTechnician || isAdmin || (isOwner && incident?.tecnico);
 
   useEffect(() => {
-    if (!incidentId) return
+    async function loadData() {
+      if (!incidentId) return;
 
-    try {
-      const fetchedIncident = getIncidentById(incidentId)
-      if (fetchedIncident) {
-        setIncident(fetchedIncident)
-      } else {
-        setError("Chamado não encontrado")
+      try {
+        // Load incident
+        const fetchedIncident = await getIncidentById(incidentId);
+        if (fetchedIncident) {
+          setIncident(fetchedIncident);
+        } else {
+          setError("Chamado não encontrado");
+        }
+
+        // Load technicians with error handling
+        try {
+          // Get users from localStorage directly to avoid async issues
+          const usersJson = localStorage.getItem("fixit_users");
+          if (!usersJson) {
+            console.log("No users found in localStorage");
+            setTechnicians([]);
+            return;
+          }
+
+          const users = JSON.parse(usersJson);
+          if (!Array.isArray(users)) {
+            console.error("Users is not an array:", users);
+            setTechnicians([]);
+            return;
+          }
+
+          const techUsers = users.filter((user) => user.role === "technician");
+          console.log("Found technicians:", techUsers.length);
+          setTechnicians(techUsers);
+        } catch (err) {
+          console.error("Erro ao carregar técnicos:", err);
+          setTechnicians([]);
+        }
+      } catch (err) {
+        setError("Erro ao carregar o chamado");
+      } finally {
+        setLoading(false);
       }
-
-      // Load technicians
-      const users = getUsers()
-      const techUsers = users.filter((user) => user.role === "technician")
-      setTechnicians(techUsers)
-    } catch (err) {
-      setError("Erro ao carregar o chamado")
-    } finally {
-      setLoading(false)
     }
-  }, [incidentId])
 
-  const handleStatusChange = (newStatus: "open" | "in_progress" | "resolved" | "closed") => {
-    if (!incident || !canChangeStatus) return
+    loadData();
+  }, [incidentId]);
+
+  const handleSolveIncident = async () => {
+    if (!incident || !canSolve) return;
 
     try {
-      const updatedIncident = updateIncident(incident.id, {
-        status: newStatus,
-        updatedAt: new Date().toISOString(),
-      })
+      const updatedIncident = await updateIncident(incident.id, {
+        status: "solucionado",
+        // Ensure the property exists in the type or remove it
+        ...(incident.dataAtualizacao !== undefined && {
+          updatedAt: new Date().toISOString(),
+        }),
+      });
 
       if (updatedIncident) {
-        setIncident(updatedIncident)
-        setSuccessMessage(`Status atualizado para ${getStatusLabel(newStatus)}`)
-        setShowSuccessAlert(true)
-        setTimeout(() => setShowSuccessAlert(false), 5000)
+        setIncident(updatedIncident);
+        setSuccessMessage("Chamado marcado como solucionado");
+        setShowSuccessAlert(true);
+        setTimeout(() => setShowSuccessAlert(false), 5000);
+        setConfirmSolveOpen(false);
       } else {
-        throw new Error("Falha ao atualizar o status")
+        throw new Error("Falha ao solucionar o chamado");
       }
     } catch (err) {
-      setErrorMessage("Erro ao atualizar o status do chamado")
-      setShowErrorAlert(true)
-      setTimeout(() => setShowErrorAlert(false), 5000)
+      setErrorMessage("Erro ao solucionar o chamado");
+      setShowErrorAlert(true);
+      setTimeout(() => setShowErrorAlert(false), 5000);
     }
-  }
+  };
 
-  const handleDeleteIncident = () => {
-    if (!incident) return
+  const handleDeleteIncident = async () => {
+    if (!incident) return;
 
     try {
-      const deleted = deleteIncident(incident.id)
+      const deleted = await deleteIncident(incident.id);
       if (deleted) {
-        router.push("/dashboard/incidents")
+        router.push("/dashboard/incidents");
       } else {
-        throw new Error("Falha ao excluir o chamado")
+        throw new Error("Falha ao excluir o chamado");
       }
     } catch (err) {
-      setErrorMessage("Erro ao excluir o chamado")
-      setShowErrorAlert(true)
-      setTimeout(() => setShowErrorAlert(false), 5000)
+      setErrorMessage("Erro ao excluir o chamado");
+      setShowErrorAlert(true);
+      setTimeout(() => setShowErrorAlert(false), 5000);
     }
-  }
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "open":
-        return "Aberto"
-      case "in_progress":
-        return "Em Progresso"
-      case "resolved":
-        return "Resolvido"
-      case "closed":
-        return "Fechado"
-      default:
-        return "Desconhecido"
-    }
-  }
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "open":
-        return <Badge className="bg-red-500 hover:bg-red-600">Aberto</Badge>
-      case "in_progress":
-        return <Badge className="bg-amber-500 hover:bg-amber-600">Em Progresso</Badge>
-      case "resolved":
-        return <Badge className="bg-green-500 hover:bg-green-600">Resolvido</Badge>
-      case "closed":
-        return <Badge variant="outline">Fechado</Badge>
-      default:
-        return <Badge variant="outline">Desconhecido</Badge>
-    }
-  }
-
-  const getPriorityBadge = (priority: string) => {
-    switch (priority) {
-      case "high":
-      case "critical":
-        return (
-          <Badge variant="outline" className="border-red-500 text-red-500">
-            {priority === "critical" ? "Crítica" : "Alta"}
-          </Badge>
-        )
-      case "medium":
-        return (
-          <Badge variant="outline" className="border-amber-500 text-amber-500">
-            Média
-          </Badge>
-        )
-      case "low":
-        return (
-          <Badge variant="outline" className="border-green-500 text-green-500">
-            Baixa
-          </Badge>
-        )
-      default:
-        return <Badge variant="outline">Normal</Badge>
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "open":
-        return <HelpCircle className="h-5 w-5" />
-      case "in_progress":
-        return <Clock className="h-5 w-5" />
-      case "resolved":
-        return <CheckCircle2 className="h-5 w-5" />
-      case "closed":
-        return <XCircle className="h-5 w-5" />
-      default:
-        return <HelpCircle className="h-5 w-5" />
-    }
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "open":
-        return "bg-red-100 text-red-500"
-      case "in_progress":
-        return "bg-amber-100 text-amber-500"
-      case "resolved":
-        return "bg-green-100 text-green-500"
-      case "closed":
-        return "bg-slate-100 text-slate-500"
-      default:
-        return "bg-slate-100 text-slate-500"
-    }
-  }
+  };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
+    const date = new Date(dateString);
     return date.toLocaleDateString("pt-BR", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-    })
-  }
+    });
+  };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy-600 mx-auto"></div>
-          <p className="mt-4 text-slate-500">Carregando detalhes do chamado...</p>
+          <p className="mt-4 text-slate-500">
+            Carregando detalhes do chamado...
+          </p>
         </div>
       </div>
-    )
+    );
   }
 
   if (error || !incident) {
@@ -256,79 +216,112 @@ export default function IncidentDetailsPage() {
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Erro</AlertTitle>
           <AlertDescription>
-            {error || "Chamado não encontrado"}. Por favor, tente novamente ou volte para a lista de chamados.
+            {error || "Chamado não encontrado"}. Por favor, tente novamente ou
+            volte para a lista de chamados.
           </AlertDescription>
         </Alert>
       </div>
-    )
+    );
   }
 
-  const handleAssignTechnician = (techId: string) => {
-    if (!incident) return
+  // Also fix the handleAssignTechnician function with similar improvements
+  const handleAssignTechnician = async (techId: string) => {
+    if (!incident) return;
 
     try {
-      const techUser = technicians.find((tech) => tech.id === techId)
+      // Find the technician in the current technicians array
+      const techUser = technicians.find((tech) => tech.id === techId);
       if (!techUser) {
-        throw new Error("Técnico não encontrado")
+        throw new Error("Técnico não encontrado");
       }
+
+      // Get initials safely
+      const initials = techUser.name
+        .split(" ")
+        .map((n: string) => n[0])
+        .join("")
+        .toUpperCase();
+
+      console.log(
+        "Assigning technician:",
+        techUser.name,
+        "with ID:",
+        techUser.id
+      );
+
+      // Create the tecnico object
+      const tecnico = {
+        id: techUser.id,
+        name: techUser.name,
+        email: techUser.email,
+        initials: initials,
+      };
+
+      // Log the update we're about to make
+      console.log("Updating incident with:", {
+        tecnico,
+      });
 
       const updatedIncident = updateIncident(incident.id, {
-        assignee: {
-          id: techUser.id,
-          name: techUser.name,
-          email: techUser.email,
-          initials: getInitials(techUser.name),
-        },
-        updatedAt: new Date().toISOString(),
-      })
+        tecnico,
+        status: "in_progress",
+      });
 
-      if (updatedIncident) {
-        setIncident(updatedIncident)
-        setSuccessMessage("Chamado atribuído com sucesso")
-        setShowSuccessAlert(true)
-        setTimeout(() => setShowSuccessAlert(false), 5000)
-        setAssignDialogOpen(false)
-      } else {
-        throw new Error("Falha ao atribuir o chamado")
+      if (!updatedIncident) {
+        throw new Error(
+          "Falha ao atribuir o chamado - updateIncident returned null"
+        );
       }
-    } catch (err) {
-      setErrorMessage("Erro ao atribuir o chamado")
-      setShowErrorAlert(true)
-      setTimeout(() => setShowErrorAlert(false), 5000)
-    }
-  }
 
-  const handleSelfAssign = () => {
-    if (!incident || !currentUser) return
+      setIncident(await updatedIncident);
+      setSuccessMessage(
+        "Chamado atribuído com sucesso e status alterado para Em Atendimento"
+      );
+      setShowSuccessAlert(true);
+      setTimeout(() => setShowSuccessAlert(false), 5000);
+      setAssignDialogOpen(false);
+    } catch (err) {
+      console.error("Error assigning technician:", err);
+      setErrorMessage(
+        err instanceof Error ? err.message : "Erro ao atribuir o chamado"
+      );
+      setShowErrorAlert(true);
+      setTimeout(() => setShowErrorAlert(false), 5000);
+    }
+  };
+  const handleSelfAssign = async () => {
+    if (!incident) return;
 
     try {
-      const updatedIncident = updateIncident(incident.id, {
-        assignee: {
-          id: currentUser.id,
-          name: currentUser.name,
-          email: currentUser.email,
-          initials: getInitials(currentUser.name),
+      const updatedIncident = await updateIncident(incident.id, {
+        tecnico: {
+          id: Number(currentUser?.id) ?? 0,
+          name: currentUser?.name ?? "Unknown",
         },
-        updatedAt: new Date().toISOString(),
-      })
+        status: "em_andamento",
+      });
 
       if (updatedIncident) {
-        setIncident(updatedIncident)
-        setSuccessMessage("Chamado atribuído a você com sucesso")
-        setShowSuccessAlert(true)
-        setTimeout(() => setShowSuccessAlert(false), 5000)
+        setIncident(updatedIncident);
+        setSuccessMessage("Incident successfully assigned to you");
+        setShowSuccessAlert(true);
+        setTimeout(() => setShowSuccessAlert(false), 5000);
       } else {
-        throw new Error("Falha ao atribuir o chamado")
+        throw new Error("Error: Unable to assign the incident");
       }
-    } catch (err) {
-      setErrorMessage("Erro ao atribuir o chamado")
-      setShowErrorAlert(true)
-      setTimeout(() => setShowErrorAlert(false), 5000)
+    } catch (err: any) {
+      const errorMessage =
+        err?.response?.data?.message ??
+        (err instanceof Error
+          ? err.message
+          : "Error while assigning the incident");
+      setErrorMessage(errorMessage);
+      setShowErrorAlert(true);
+      setTimeout(() => setShowErrorAlert(false), 5000);
     }
-  }
-
+  };
   const handleAddComment = () => {
-    if (!incident || !currentUser || !comment.trim()) return
+    if (!incident || !currentUser || !comment.trim()) return;
 
     try {
       const updatedIncident = addCommentToIncident(incident.id, {
@@ -338,115 +331,162 @@ export default function IncidentDetailsPage() {
           name: currentUser.name,
         },
         createdAt: new Date().toISOString(),
-      })
+      });
 
       if (updatedIncident) {
-        setIncident(updatedIncident)
-        setComment("")
-        setSuccessMessage("Comentário adicionado com sucesso")
-        setShowSuccessAlert(true)
-        setTimeout(() => setShowSuccessAlert(false), 5000)
+        setIncident(updatedIncident);
+        setComment("");
+        setSuccessMessage("Comentário adicionado com sucesso");
+        setShowSuccessAlert(true);
+        setTimeout(() => setShowSuccessAlert(false), 5000);
       } else {
-        throw new Error("Falha ao adicionar comentário")
+        throw new Error("Falha ao adicionar comentário");
       }
     } catch (err) {
-      setErrorMessage("Erro ao adicionar comentário")
-      setShowErrorAlert(true)
-      setTimeout(() => setShowErrorAlert(false), 5000)
+      setErrorMessage("Erro ao adicionar comentário");
+      setShowErrorAlert(true);
+      setTimeout(() => setShowErrorAlert(false), 5000);
     }
-  }
+  };
 
-  // Helper function to get initials
+  // Fix the getInitials function to be more robust
   const getInitials = (name: string): string => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-  }
+    if (!name) return "??";
+
+    return (
+      name
+        .split(" ")
+        .filter((part) => part.length > 0)
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase() || "??"
+    );
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <Button variant="outline" asChild>
-          <Link href="/dashboard/incidents">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Voltar para Chamados
-          </Link>
-        </Button>
+    <>
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <Button variant="outline" asChild>
+            <Link href="/dashboard/incidents">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Voltar para Chamados
+            </Link>
+          </Button>
 
-        <div className="flex gap-2">
-          {isOwner && (
-            <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
-              <DialogTrigger asChild>
-                <Button variant="destructive">
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Excluir Chamado
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Confirmar exclusão</DialogTitle>
-                  <DialogDescription>
-                    Tem certeza que deseja excluir este chamado? Esta ação não pode ser desfeita.
-                  </DialogDescription>
-                </DialogHeader>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setConfirmDeleteOpen(false)}>
-                    Cancelar
+          <div className="flex gap-2">
+            {canSolve &&
+              (incident.status === "em_atendimento" ||
+                incident.status === "in_progress") && (
+                <Dialog
+                  open={confirmSolveOpen}
+                  onOpenChange={setConfirmSolveOpen}
+                >
+                  <DialogTrigger asChild>
+                    <Button className="bg-green-600 hover:bg-green-700 text-white">
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      Solucionar Chamado
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Confirmar solução</DialogTitle>
+                      <DialogDescription>
+                        Tem certeza que deseja marcar este chamado como
+                        solucionado?
+                      </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setConfirmSolveOpen(false)}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        className="bg-green-600 hover:bg-green-700"
+                        onClick={handleSolveIncident}
+                      >
+                        Confirmar
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
+
+            {isOwner && (
+              <Dialog
+                open={confirmDeleteOpen}
+                onOpenChange={setConfirmDeleteOpen}
+              >
+                <DialogTrigger asChild>
+                  <Button variant="destructive">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Excluir Chamado
                   </Button>
-                  <Button variant="destructive" onClick={handleDeleteIncident}>
-                    Excluir
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          )}
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Confirmar exclusão</DialogTitle>
+                    <DialogDescription>
+                      Tem certeza que deseja excluir este chamado? Esta ação não
+                      pode ser desfeita.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setConfirmDeleteOpen(false)}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={handleDeleteIncident}
+                    >
+                      Excluir
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Success and Error Alerts */}
-      {showSuccessAlert && (
-        <Alert className="bg-green-50 text-green-700 border-green-200">
-          <CheckCircle2 className="h-4 w-4" />
-          <AlertTitle>Sucesso</AlertTitle>
-          <AlertDescription>{successMessage}</AlertDescription>
-        </Alert>
-      )}
+        {/* Success and Error Alerts */}
+        {showSuccessAlert && (
+          <Alert className="bg-green-50 text-green-700 border-green-200">
+            <CheckCircle2 className="h-4 w-4" />
+            <AlertTitle>Sucesso</AlertTitle>
+            <AlertDescription>{successMessage}</AlertDescription>
+          </Alert>
+        )}
 
-      {showErrorAlert && (
-        <Alert className="bg-red-50 text-red-700 border-red-200">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Erro</AlertTitle>
-          <AlertDescription>{errorMessage}</AlertDescription>
-        </Alert>
-      )}
-
-      {/* Incident Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-start">
-        <div className={`rounded-full p-3 ${getStatusColor(incident.status)} md:mt-2`}>
-          {getStatusIcon(incident.status)}
-        </div>
+        {showErrorAlert && (
+          <Alert className="bg-red-50 text-red-700 border-red-200">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Erro</AlertTitle>
+            <AlertDescription>{errorMessage}</AlertDescription>
+          </Alert>
+        )}
 
         <div className="flex-1">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-navy-900">{incident.title}</h1>
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-                <span className="font-medium">{incident.id}</span>
-                <span>•</span>
-                <span>{incident.department.charAt(0).toUpperCase() + incident.department.slice(1)}</span>
-              </div>
+              <h1 className="text-2xl font-bold tracking-tight text-navy-900">
+                {incident.titulo.charAt(0).toUpperCase() +
+                  incident.titulo.slice(1)}
+              </h1>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500"></div>
             </div>
 
             <div className="flex flex-wrap gap-2 mt-2 sm:mt-0">
-              {getStatusBadge(incident.status)}
-              {getPriorityBadge(incident.priority)}
+              <StatusBadge status={incident.status.toUpperCase()} />
+              <PriorityBadge priority={incident.prioridade} />
             </div>
           </div>
         </div>
       </div>
-
       <div className="grid gap-6 md:grid-cols-3">
         {/* Main Content */}
         <div className="md:col-span-2 space-y-6">
@@ -455,98 +495,39 @@ export default function IncidentDetailsPage() {
               <CardTitle>Descrição do Problema</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="whitespace-pre-wrap">{incident.description}</p>
+              <p className="whitespace-pre-wrap">{incident.descricao}</p>
             </CardContent>
           </Card>
 
-          {/* Status Management (Only for assigned Technician or Admin) */}
-          {canChangeStatus && (
+            {/* Status Information */}
             <Card>
-              <CardHeader>
-                <CardTitle>Gerenciar Status</CardTitle>
-                <CardDescription>Atualize o status deste chamado</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                    <Button
-                      variant={incident.status === "open" ? "default" : "outline"}
-                      className={incident.status === "open" ? "bg-red-500 hover:bg-red-600" : ""}
-                      onClick={() => handleStatusChange("open")}
-                    >
-                      <HelpCircle className="mr-2 h-4 w-4" />
-                      Aberto
-                    </Button>
-                    <Button
-                      variant={incident.status === "in_progress" ? "default" : "outline"}
-                      className={incident.status === "in_progress" ? "bg-amber-500 hover:bg-amber-600" : ""}
-                      onClick={() => handleStatusChange("in_progress")}
-                    >
-                      <Clock className="mr-2 h-4 w-4" />
-                      Em Progresso
-                    </Button>
-                    <Button
-                      variant={incident.status === "resolved" ? "default" : "outline"}
-                      className={incident.status === "resolved" ? "bg-green-500 hover:bg-green-600" : ""}
-                      onClick={() => handleStatusChange("resolved")}
-                    >
-                      <CheckCircle2 className="mr-2 h-4 w-4" />
-                      Resolvido
-                    </Button>
-                    <Button
-                      variant={incident.status === "closed" ? "default" : "outline"}
-                      onClick={() => handleStatusChange("closed")}
-                    >
-                      <XCircle className="mr-2 h-4 w-4" />
-                      Fechado
-                    </Button>
-                  </div>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+              <CardTitle>Status do Chamado</CardTitle>
+              <span
 
-                  <div className="pt-4">
-                    <Label htmlFor="comment">Adicionar Comentário</Label>
-                    <Textarea
-                      id="comment"
-                      placeholder="Adicione informações sobre a atualização do status..."
-                      className="mt-2"
-                      value={comment}
-                      onChange={(e) => setComment(e.target.value)}
-                    />
-                    <Button
-                      className="mt-2 bg-navy-600 hover:bg-navy-700 text-white"
-                      onClick={handleAddComment}
-                      disabled={!comment.trim()}
-                    >
-                      Adicionar Comentário
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
+              >
+                {incident.tecnico?.name === undefined ? (
+                <StatusLabel status={incident.status} />
+                ) : incident.tecnico ? (
+                <StatusLabel status={incident.status} />
+                ) : (
+                "Status do técnico desconhecido."
+                )}
+              </span>
+              </div>
+            </CardHeader>
             </Card>
-          )}
 
-          {isTechnician && !canChangeStatus && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Gerenciar Status</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-4 text-slate-500">
-                  <p>Apenas o técnico atribuído pode alterar o status deste chamado.</p>
-                  {!incident.assignee && <p className="mt-2">Este chamado ainda não possui um técnico atribuído.</p>}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Comments Section */}
+          {/*.comentarios Section */}
           <Card>
             <CardHeader>
               <CardTitle>Comentários</CardTitle>
             </CardHeader>
             <CardContent>
-              {incident.comments && incident.comments.length > 0 ? (
+              {incident.comentarios && incident.comentarios.length > 0 ? (
                 <div className="space-y-4">
-                  {incident.comments.map((comment, index) => (
+                  {incident.comentarios.map((comment, index) => (
                     <div key={index} className="rounded-lg border p-4">
                       <div className="flex items-center gap-2">
                         <Avatar className="h-6 w-6">
@@ -559,11 +540,17 @@ export default function IncidentDetailsPage() {
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <div className="font-medium">{comment.createdBy.name}</div>
-                          <div className="text-xs text-slate-500">{formatDate(comment.createdAt)}</div>
+                          <div className="font-medium">
+                            {comment.createdBy.name}
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            {formatDate(comment.createdAt)}
+                          </div>
                         </div>
                       </div>
-                      <p className="mt-2 whitespace-pre-wrap text-sm">{comment.text}</p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm">
+                        {comment.text}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -595,14 +582,15 @@ export default function IncidentDetailsPage() {
                 </div>
               </CardFooter>
             )}
-            {!canComment && incident.assignee && (
+            {!canComment && incident.tecnico && (
               <CardFooter className="border-t pt-4">
                 <div className="w-full text-center text-sm text-slate-500">
-                  Apenas o técnico atribuído pode adicionar comentários
+                  Apenas o técnico atribuído e o criador do chamado podem
+                  adicionar comentários
                 </div>
               </CardFooter>
             )}
-            {!canComment && !incident.assignee && (
+            {!canComment && !incident.tecnico && (
               <CardFooter className="border-t pt-4">
                 <div className="w-full text-center text-sm text-slate-500">
                   Um técnico precisa ser atribuído para adicionar comentários
@@ -620,29 +608,42 @@ export default function IncidentDetailsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1">
-                <div className="text-sm font-medium text-slate-500">Criado por</div>
+                <div className="text-sm font-medium text-slate-500">
+                  Protocolo
+                  <p className="font-medium"> {incident.codigo}</p>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <div className="text-sm font-medium text-slate-500">
+                  Criado por
+                </div>
                 <div className="flex items-center gap-2">
                   <Avatar className="h-6 w-6">
                     <AvatarFallback>
-                      {incident.createdBy.name
+                      {incident.usuario?.name
                         .split(" ")
                         .map((n) => n[0])
                         .join("")
                         .toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                  <span>{incident.createdBy.name}</span>
+                  <span>{incident.usuario?.name}</span>
                 </div>
               </div>
 
               <div className="space-y-1">
-                <div className="text-sm font-medium text-slate-500">Atribuído a</div>
-                {incident.assignee ? (
+                <div className="text-sm font-medium text-slate-500">
+                  Atribuído a
+                </div>
+                {incident.tecnico ? (
                   <div className="flex items-center gap-2">
                     <Avatar className="h-6 w-6">
-                      <AvatarFallback>{incident.assignee.initials}</AvatarFallback>
+                      <AvatarFallback>
+                        {getInitials(incident.tecnico.name)}
+                      </AvatarFallback>
                     </Avatar>
-                    <span>{incident.assignee.name}</span>
+                    <span>{incident.tecnico.name}</span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 text-slate-500">
@@ -652,12 +653,18 @@ export default function IncidentDetailsPage() {
                 )}
 
                 {/* Assignment options */}
-                {canAssign && !incident.assignee && (
+                {canAssign && !incident.tecnico && (
                   <div className="mt-2 flex flex-col gap-2">
                     {isAdmin ? (
-                      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+                      <Dialog
+                        open={assignDialogOpen}
+                        onOpenChange={setAssignDialogOpen}
+                      >
                         <DialogTrigger asChild>
-                          <Button size="sm" className="w-full bg-navy-600 hover:bg-navy-700 text-white">
+                          <Button
+                            size="sm"
+                            className="w-full bg-navy-600 hover:bg-navy-700 text-white"
+                          >
                             <UserPlus className="mr-2 h-4 w-4" />
                             Atribuir Técnico
                           </Button>
@@ -665,30 +672,49 @@ export default function IncidentDetailsPage() {
                         <DialogContent>
                           <DialogHeader>
                             <DialogTitle>Atribuir Técnico</DialogTitle>
-                            <DialogDescription>Selecione um técnico para atribuir a este chamado</DialogDescription>
+                            <DialogDescription>
+                              Selecione um técnico para atribuir a este chamado
+                            </DialogDescription>
                           </DialogHeader>
                           <div className="py-4">
-                            <Select value={selectedTechnician} onValueChange={setSelectedTechnician}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecione um técnico" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {technicians.map((tech) => (
-                                  <SelectItem key={tech.id} value={tech.id}>
-                                    {tech.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            {technicians.length > 0 ? (
+                              <Select
+                                value={selectedTechnician}
+                                onValueChange={setSelectedTechnician}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione um técnico" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {technicians.map((tech) => (
+                                    <SelectItem key={tech.id} value={tech.id}>
+                                      {tech.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <div className="text-center py-2 text-slate-500">
+                                Não foi possível carregar a lista de técnicos.
+                                Por favor, tente novamente mais tarde.
+                              </div>
+                            )}
                           </div>
                           <DialogFooter>
-                            <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>
+                            <Button
+                              variant="outline"
+                              onClick={() => setAssignDialogOpen(false)}
+                            >
                               Cancelar
                             </Button>
                             <Button
                               className="bg-navy-600 hover:bg-navy-700 text-white"
-                              onClick={() => handleAssignTechnician(selectedTechnician)}
-                              disabled={!selectedTechnician}
+                              onClick={() =>
+                                handleAssignTechnician(selectedTechnician)
+                              }
+                              disabled={
+                                !selectedTechnician || technicians.length === 0
+                              }
                             >
                               Atribuir
                             </Button>
@@ -712,65 +738,51 @@ export default function IncidentDetailsPage() {
               <Separator />
 
               <div className="space-y-1">
-                <div className="text-sm font-medium text-slate-500">Departamento</div>
+                <div className="text-sm font-medium text-slate-500">
+                  Departamento
+                </div>
                 <div className="flex items-center gap-2">
                   <Tag className="h-4 w-4 text-slate-500" />
-                  <span>{incident.department.charAt(0).toUpperCase() + incident.department.slice(1)}</span>
+                  <span>
+                    {incident.usuario?.department
+                      ? incident.usuario.department.charAt(0).toUpperCase() +
+                        incident.usuario.department.slice(1)
+                      : "N/A"}
+                  </span>
                 </div>
               </div>
 
               <div className="space-y-1">
-                <div className="text-sm font-medium text-slate-500">Prioridade</div>
-                <div>{getPriorityBadge(incident.priority)}</div>
+                <div className="text-sm font-medium text-slate-500">
+                  Prioridade
+                </div>
+                <div>{PriorityBadge({ priority: incident.prioridade })}</div>
               </div>
 
               <Separator />
 
               <div className="space-y-1">
-                <div className="text-sm font-medium text-slate-500">Criado em</div>
+                <div className="text-sm font-medium text-slate-500">
+                  Criado em
+                </div>
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-slate-500" />
-                  <span>{formatDate(incident.createdAt)}</span>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <div className="text-sm font-medium text-slate-500">Última atualização</div>
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-slate-500" />
-                  <span>{formatDate(incident.updatedAt)}</span>
+                  <span>{formatDate(incident.dataCriacao)}</span>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Ações</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button variant="outline" className="w-full justify-start" asChild>
-                <Link href={`/dashboard/incidents`}>
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Voltar para Chamados
-                </Link>
-              </Button>
-
-              {isOwner && (
-                <Button
-                  variant="destructive"
-                  className="w-full justify-start"
-                  onClick={() => setConfirmDeleteOpen(true)}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Excluir Chamado
-                </Button>
-              )}
-            </CardContent>
-          </Card>
+          {canSolve && (
+            <Button
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={handleAddComment}
+            >
+              Solucionar Chamado
+            </Button>
+          )}
         </div>
       </div>
-    </div>
-  )
+    </>
+  );
 }
-

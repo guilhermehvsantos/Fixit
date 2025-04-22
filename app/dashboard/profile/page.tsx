@@ -1,143 +1,175 @@
-"use client"
+"use client";
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { AlertCircle, CheckCircle2, User } from "lucide-react"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { getCurrentUser, getUsers } from "@/app/lib/auth"
-import type { User as UserType } from "@/app/lib/auth"
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { AlertCircle, CheckCircle2, User } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { getCurrentUser } from "@/app/lib/auth";
+import type { User as UserType } from "@/app/lib/auth";
 
 export default function ProfilePage() {
-  const [user, setUser] = useState<UserType | null>(null)
-  const [name, setName] = useState("")
-  const [email, setEmail] = useState("")
-  const [telephone, setTelephone] = useState("")
-  const [department, setDepartment] = useState("")
-  const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [showSuccessAlert, setShowSuccessAlert] = useState(false)
-  const [showErrorAlert, setShowErrorAlert] = useState(false)
-  const [errorMessage, setErrorMessage] = useState("")
-  const router = useRouter()
+  const [user, setUser] = useState<UserType | null>(null);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [telephone, setTelephone] = useState("");
+  const [department, setDepartment] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+  const [showErrorAlert, setShowErrorAlert] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const router = useRouter();
 
   useEffect(() => {
-    // Get current user
-    const currentUser = getCurrentUser()
+    // Fetch the current user
+    const currentUser = getCurrentUser();
     if (!currentUser) {
-      router.push("/login")
-      return
+      router.push("/login");
+      return;
     }
 
-    // Get full user data including password
-    const allUsers = getUsers()
-    const fullUserData = allUsers.find((u) => u.id === currentUser.id)
+    // Set user data
+    setUser({ ...currentUser, password: "" });
+    setName(currentUser.name);
+    setEmail(currentUser.email);
+    setTelephone(currentUser.telephone || "");
+    setDepartment(currentUser.department || "");
+  }, [router]);
 
-    if (fullUserData) {
-      setUser(fullUserData)
-      setName(fullUserData.name)
-      setEmail(fullUserData.email)
-      setTelephone(fullUserData.telephone || "")
-      setDepartment(fullUserData.department || "")
-    }
-  }, [router])
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
     try {
       // Validation
       if (!name || !email) {
-        setErrorMessage("Por favor, preencha todos os campos obrigatórios.")
-        setShowErrorAlert(true)
-        setTimeout(() => setShowErrorAlert(false), 5000)
-        return
+        setErrorMessage("Por favor, preencha todos os campos obrigatórios.");
+        setShowErrorAlert(true);
+        setTimeout(() => setShowErrorAlert(false), 5000);
+        return;
       }
 
-      // If password is being changed, validate it
       if (password) {
         if (password !== confirmPassword) {
-          setErrorMessage("As senhas não coincidem.")
-          setShowErrorAlert(true)
-          setTimeout(() => setShowErrorAlert(false), 5000)
-          return
+          setErrorMessage("As senhas não coincidem.");
+          setShowErrorAlert(true);
+          setTimeout(() => setShowErrorAlert(false), 5000);
+          return;
         }
 
         if (password.length < 6) {
-          setErrorMessage("A senha deve ter pelo menos 6 caracteres.")
-          setShowErrorAlert(true)
-          setTimeout(() => setShowErrorAlert(false), 5000)
-          return
+          setErrorMessage("A senha deve ter pelo menos 6 caracteres.");
+          setShowErrorAlert(true);
+          setTimeout(() => setShowErrorAlert(false), 5000);
+          return;
         }
       }
 
-      // Get all users
-      const allUsers = getUsers()
+      // Update user data
+      const updatedUser: Partial<UserType> = {
+        id: user?.id,
+        name,
+        email,
+        telephone: telephone || undefined, // Ensure optional fields are handled
+        department:
+          user?.role === "technician" ? "suporte" : department || undefined,
+        role: user?.role,
+        ...(password ? { password } : {}), // Include password only if provided
+      };
 
-      // Check if email already exists (except for the current user)
-      const existingUser = allUsers.find((u) => u.email === email && u.id !== user?.id)
-      if (existingUser) {
-        setErrorMessage("Este email já está em uso.")
-        setShowErrorAlert(true)
-        setTimeout(() => setShowErrorAlert(false), 5000)
-        return
-      }
+      console.log("Updated User Payload:", updatedUser); // Debugging log
 
-      // Find user to update
-      const userIndex = allUsers.findIndex((u) => u.id === user?.id)
-
-      if (userIndex !== -1) {
-        // Update user data
-        allUsers[userIndex] = {
-          ...allUsers[userIndex],
-          name,
-          email,
-          telephone,
-          // Don't change department for technicians
-          department: allUsers[userIndex].role === "technician" ? "suporte" : department,
-          // Only update password if a new one was provided
-          ...(password ? { password } : {}),
+      // Send updated data to the backend
+      const response = await fetch(
+        `http://localhost:8080/usuarios/${user?.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updatedUser),
         }
+      );
 
-        // Save to localStorage
-        localStorage.setItem("fixit_users", JSON.stringify(allUsers))
+      const result = await response.json();
 
-        // Update current user in session
-        const { password: _, ...userWithoutPassword } = allUsers[userIndex]
-        localStorage.setItem("fixit_current_user", JSON.stringify(userWithoutPassword))
+      console.log("Response:", response); // Debugging log
+      console.log("Result:", result); // Debugging log
 
-        // Show success message
-        setShowSuccessAlert(true)
-        setTimeout(() => setShowSuccessAlert(false), 5000)
-
-        // Reset password fields
-        setPassword("")
-        setConfirmPassword("")
+      if (!response.ok) {
+        throw new Error(
+          result.message || "Erro ao atualizar perfil no servidor."
+        );
       }
+
+      // Update the user in localStorage
+      const updatedCurrentUser = { ...user, ...updatedUser };
+      localStorage.setItem(
+        "fixit_current_user",
+        JSON.stringify(updatedCurrentUser)
+      );
+
+      // Update the state with the new user data
+      setUser({
+        ...updatedCurrentUser,
+        id: updatedCurrentUser.id || "",
+      } as UserType);
+      setName(updatedCurrentUser.name || "");
+      setEmail(updatedCurrentUser.email || "");
+      setTelephone(updatedCurrentUser.telephone || "");
+      setDepartment(updatedCurrentUser.department || "");
+
+      // Show success message
+      setShowSuccessAlert(true);
+      setTimeout(() => setShowSuccessAlert(false), 5000);
+
+      window.location.reload();
+      // Reset password fields
+      setPassword("");
+      setConfirmPassword("");
     } catch (error) {
-      console.error("Error updating profile:", error)
-      setErrorMessage("Erro ao atualizar perfil. Tente novamente.")
-      setShowErrorAlert(true)
-      setTimeout(() => setShowErrorAlert(false), 5000)
+      console.error("Error updating profile:", error);
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Erro ao atualizar perfil. Tente novamente."
+      );
+      setShowErrorAlert(true);
+      setTimeout(() => setShowErrorAlert(false), 5000);
     }
-  }
+  };
 
   if (!user) {
-    return null // Don't render anything until user data is loaded
+    return null; // Don't render anything until user data is loaded
   }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-navy-900">Meu Perfil</h1>
-        <p className="text-slate-500">Gerencie suas informações pessoais e senha.</p>
+        <h1 className="text-2xl font-bold tracking-tight text-navy-900">
+          Meu Perfil
+        </h1>
+        <p className="text-slate-500">
+          Gerencie suas informações pessoais e senha.
+        </p>
       </div>
 
       {/* Success and Error Alerts */}
@@ -162,10 +194,16 @@ export default function ProfilePage() {
         <Card>
           <CardHeader>
             <CardTitle>Informações Pessoais</CardTitle>
-            <CardDescription>Atualize suas informações pessoais.</CardDescription>
+            <CardDescription>
+              Atualize suas informações pessoais.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <form id="profile-form" onSubmit={handleSubmit} className="space-y-4">
+            <form
+              id="profile-form"
+              onSubmit={handleSubmit}
+              className="space-y-4"
+            >
               <div className="flex justify-center mb-6">
                 <Avatar className="h-24 w-24">
                   <AvatarFallback className="text-2xl">
@@ -235,10 +273,18 @@ export default function ProfilePage() {
                   <User className="h-4 w-4" />
                   <span>
                     Tipo de usuário:{" "}
-                    {user.role === "admin" ? "Administrador" : user.role === "technician" ? "Técnico" : "Usuário"}
+                    {user.role === "admin"
+                      ? "Administrador"
+                      : user.role === "technician"
+                      ? "Técnico"
+                      : "Usuário"}
                   </span>
                 </div>
-                {user.role === "technician" && <div className="mt-1 text-sm text-slate-500">Departamento: Suporte</div>}
+                {user.role === "technician" && (
+                  <div className="mt-1 text-sm text-slate-500">
+                    Departamento: Suporte
+                  </div>
+                )}
               </div>
             </form>
           </CardContent>
@@ -261,7 +307,9 @@ export default function ProfilePage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
-                <p className="text-xs text-slate-500">Deixe em branco para manter a senha atual</p>
+                <p className="text-xs text-slate-500">
+                  Deixe em branco para manter a senha atual
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -277,13 +325,16 @@ export default function ProfilePage() {
             </div>
           </CardContent>
           <CardFooter>
-            <Button type="submit" form="profile-form" className="w-full bg-navy-600 hover:bg-navy-700 text-white">
+            <Button
+              type="submit"
+              form="profile-form"
+              className="w-full bg-navy-600 hover:bg-navy-700 text-white"
+            >
               Salvar Alterações
             </Button>
           </CardFooter>
         </Card>
       </div>
     </div>
-  )
+  );
 }
-

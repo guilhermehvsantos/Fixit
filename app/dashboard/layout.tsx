@@ -1,28 +1,28 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState, useEffect } from "react"
-import Link from "next/link"
-import Image from "next/image"
-import { usePathname, useRouter } from "next/navigation"
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart3,
   Bell,
   BookOpen,
   ChevronDown,
   Home,
-  LifeBuoy,
+  ClockAlert,
   LogOut,
   Menu,
   Settings,
   User,
   Users,
   X,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,30 +30,47 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { getCurrentUser, logoutUser, initializeAdminUser, isAdmin } from "@/app/lib/auth"
-import { getIncidents } from "@/app/lib/incidents"
+} from "@/components/ui/dropdown-menu";
+import {
+  getCurrentUser,
+  logoutUser,
+  isAdmin,
+  initializeDefaultUsers,
+} from "@/app/lib/auth";
+import { getAllIncidents } from "@/app/lib/incidents";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-  const pathname = usePathname()
-  const router = useRouter()
-  const [currentUser, setCurrentUser] = useState<any>(null)
-  const [openIncidentsCount, setOpenIncidentsCount] = useState(0)
-  const [isAdminUser, setIsAdminUser] = useState(false)
-  const [userInitials, setUserInitials] = useState("U")
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const pathname = usePathname();
+  const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [openIncidentsCount, setOpenIncidentsCount] = useState(0);
+  const [isAdminUser, setIsAdminUser] = useState(false);
+  const [userInitials, setUserInitials] = useState("U");
+  const [isRegularUser, setIsRegularUser] = useState(false);
 
   useEffect(() => {
-    // Initialize admin user if it doesn't exist
-    initializeAdminUser()
+    // Initialize default users if they don't exist
+    initializeDefaultUsers();
 
     // Check if user is logged in
-    const user = getCurrentUser()
+    const user = getCurrentUser();
     if (!user) {
-      router.push("/login")
-      return
+      router.push("/login");
+      return;
     }
-    setCurrentUser(user)
+    setCurrentUser(user);
+
+    // Check if user is a regular user
+    setIsRegularUser(
+      !user?.role ||
+        user?.role === "user" ||
+        user?.role.toLowerCase() === "user"
+    );
 
     // Generate user initials
     if (user.name) {
@@ -61,55 +78,81 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         .split(" ")
         .map((n) => n[0])
         .slice(0, 2)
-        .join("")
-      setUserInitials(initials)
+        .join("");
+      setUserInitials(initials);
     }
 
     // Check if user is admin
-    setIsAdminUser(isAdmin())
+    setIsAdminUser(isAdmin());
 
     // Get open incidents count
-    const incidents = getIncidents()
-    const openCount = incidents.filter((inc) => inc.status === "open").length
-    setOpenIncidentsCount(openCount)
-  }, [router])
+    const fetchIncidents = async () => {
+      const incidents = await getAllIncidents();
+      const openCount = incidents.filter(
+        (inc: { status: string }) => inc.status === "open"
+      ).length;
+      setOpenIncidentsCount(openCount);
+    };
+
+    fetchIncidents();
+  }, [router]);
 
   const isActive = (path: string) => {
-    return pathname === path
-  }
+    return pathname === path;
+  };
 
   const handleLogout = () => {
-    logoutUser()
-    router.push("/")
-  }
+    logoutUser();
+    router.push("/");
+  };
 
-  // Update the navItems array to remove Chat, change Tickets, and rename Incidents to Chamados
+  // Update the navItems array to include Profile
   const navItems = [
     { name: "Dashboard", href: "/dashboard", icon: Home },
     {
       name: "Chamados",
       href: "/dashboard/incidents",
-      icon: LifeBuoy,
+      icon: ClockAlert,
       badge: openIncidentsCount > 0 ? openIncidentsCount.toString() : undefined,
     },
-    { name: "Base de Conhecimento", href: "/dashboard/knowledge", icon: BookOpen },
+    {
+      name: "Base de Conhecimento",
+      href: "/dashboard/knowledge",
+      icon: BookOpen,
+    },
+    {
+      name: "Perfil", // New Profile Nav Item
+      href: "/dashboard/profile",
+      icon: User,
+    },
     ...(isAdminUser || currentUser?.role === "technician"
       ? [{ name: "Relatórios", href: "/dashboard/reports", icon: BarChart3 }]
       : []),
-    ...(isAdminUser ? [{ name: "Usuários", href: "/dashboard/users", icon: Users }] : []),
+    ...(isAdminUser
+      ? [{ name: "Usuários", href: "/dashboard/users", icon: Users }]
+      : []),
     { name: "Configurações", href: "/dashboard/settings", icon: Settings },
-  ]
+  ];
 
   if (!currentUser) {
-    return null // Don't render anything until we check authentication
+    return null; // Don't render anything until we check authentication
   }
 
   return (
     <div className="flex h-screen bg-slate-100">
       {/* Mobile sidebar toggle */}
       <div className="fixed left-4 top-4 z-50 block md:hidden">
-        <Button variant="outline" size="icon" onClick={() => setSidebarOpen(!sidebarOpen)} className="bg-white">
-          {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="bg-white"
+        >
+          {sidebarOpen ? (
+            <X className="h-5 w-5" />
+          ) : (
+            <Menu className="h-5 w-5" />
+          )}
         </Button>
       </div>
 
@@ -123,22 +166,33 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* Sidebar header */}
           <div className="flex h-16 items-center justify-between border-b px-4">
             <Link href="/dashboard" className="flex items-center gap-2">
-              <Image src="/placeholder.svg?height=32&width=32" alt="FixIt Logo" width={32} height={32} />
+              <Image
+                src="/images/LogoFixit.png"
+                alt="FixIt Logo"
+                width={32}
+                height={32}
+                className="rounded-sm"
+              />
               <span className="text-xl font-bold text-navy-700">FixIt</span>
             </Link>
-            <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(false)} className="md:hidden">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarOpen(false)}
+              className="md:hidden"
+            >
               <X className="h-5 w-5" />
             </Button>
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 overflow-y-auto p-4">
-            <ul className="space-y-1">
+          <nav className="flex-1 overflow-y-auto p-5">
+            <ul className="space-y-3">
               {navItems.map((item) => (
                 <li key={item.name}>
                   <Link
                     href={item.href}
-                    className={`flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium ${
+                    className={`flex items-center justify-between rounded-md px-3 py-2 text-sm font-semibold ${
                       isActive(item.href)
                         ? "bg-navy-50 text-navy-700"
                         : "text-slate-700 hover:bg-slate-100 hover:text-navy-600"
@@ -148,7 +202,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       <item.icon className="h-5 w-5" />
                       <span>{item.name}</span>
                     </div>
-                    {item.badge && <Badge className="bg-navy-600 hover:bg-navy-700">{item.badge}</Badge>}
+                    {item.badge && (
+                      <Badge className="bg-navy-600 hover:bg-navy-700">
+                        {item.badge}
+                      </Badge>
+                    )}
                   </Link>
                 </li>
               ))}
@@ -165,10 +223,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       <AvatarFallback>{userInitials}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1 text-left">
-                      <p className="text-sm font-medium">{currentUser?.name || "Usuário"}</p>
+                      <p className="text-sm font-medium">
+                        {currentUser?.name || "Usuário"}
+                      </p>
                       <p className="text-xs text-slate-500">
                         {currentUser?.department
-                          ? currentUser.department.charAt(0).toUpperCase() + currentUser.department.slice(1)
+                          ? currentUser.department.charAt(0).toUpperCase() +
+                            currentUser.department.slice(1)
                           : "Departamento"}
                       </p>
                     </div>
@@ -205,7 +266,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Top header */}
         <header className="flex h-16 items-center justify-between border-b bg-white px-4 md:px-6">
           <Link href="/dashboard" className="flex items-center gap-2 md:hidden">
-            <Image src="/placeholder.svg?height=32&width=32" alt="FixIt Logo" width={32} height={32} />
+            <Image
+              src="/images/LogoFixit.png"
+              alt="FixIt Logo"
+              width={32}
+              height={32}
+              className="rounded-sm"
+            />
             <span className="text-xl font-bold text-navy-700">FixIt</span>
           </Link>
           <div className="flex-1"></div>
@@ -234,13 +301,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         </Badge>
                       </div>
                       <span className="text-sm text-slate-500">
-                        Você tem {openIncidentsCount} chamado{openIncidentsCount !== 1 ? "s" : ""} aberto
-                        {openIncidentsCount !== 1 ? "s" : ""} que requer{openIncidentsCount !== 1 ? "em" : ""} atenção.
+                        Você tem {openIncidentsCount} chamado
+                        {openIncidentsCount !== 1 ? "s" : ""} aberto
+                        {openIncidentsCount !== 1 ? "s" : ""} que requer
+                        {openIncidentsCount !== 1 ? "em" : ""} atenção.
                       </span>
                       <span className="mt-1 text-xs text-slate-400">Agora</span>
                     </DropdownMenuItem>
                   ) : (
-                    <div className="py-2 px-2 text-center text-sm text-slate-500">Não há notificações no momento</div>
+                    <div className="py-2 px-2 text-center text-sm text-slate-500">
+                      Não há notificações no momento
+                    </div>
                   )}
                 </div>
                 <DropdownMenuSeparator />
@@ -286,6 +357,5 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
       </div>
     </div>
-  )
+  );
 }
-

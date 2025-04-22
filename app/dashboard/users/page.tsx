@@ -52,6 +52,19 @@ export default function UsersPage() {
   const [editUserRole, setEditUserRole] = useState<"admin" | "user" | "technician" | undefined>("user")
   const [editDialogOpen, setEditDialogOpen] = useState(false)
 
+  const loadUsers = async () => {
+    try {
+      const loadedUsers = await getUsers()
+      // Remove passwords for security
+      const usersWithoutPasswords = loadedUsers.map(({ password, ...rest }) => rest) as UserType[]
+      setUsers(usersWithoutPasswords)
+    } catch (error) {
+      console.error("Error loading users:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
     // Check if user is admin
     const adminCheck = isAdmin()
@@ -67,15 +80,7 @@ export default function UsersPage() {
     loadUsers()
   }, [router])
 
-  const loadUsers = () => {
-    const loadedUsers = getUsers()
-    // Remove passwords for security
-    const usersWithoutPasswords = loadedUsers.map(({ password, ...rest }) => rest) as UserType[]
-    setUsers(usersWithoutPasswords)
-    setLoading(false)
-  }
-
-  const handleCreateTechnician = (e: React.FormEvent) => {
+  const handleCreateTechnician = async (e: React.FormEvent) => {
     e.preventDefault()
 
     try {
@@ -88,10 +93,10 @@ export default function UsersPage() {
       }
 
       // Get all users including passwords
-      const allUsers = getUsers()
+      const allUsers = await getUsers()
 
       // Check if email already exists
-      const existingUser = allUsers.find((user) => user.email === newTechEmail)
+      const existingUser: UserType | undefined = allUsers.find((user: UserType) => user.email === newTechEmail)
       if (existingUser) {
         setErrorMessage("Este email já está em uso.")
         setShowErrorAlert(true)
@@ -151,7 +156,7 @@ export default function UsersPage() {
     setEditDialogOpen(true)
   }
 
-  const handleSaveUserEdit = (e: React.FormEvent) => {
+  const handleSaveUserEdit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     try {
@@ -164,7 +169,7 @@ export default function UsersPage() {
       }
 
       // Get all users including passwords
-      const allUsers = getUsers()
+      const allUsers = await getUsers()
 
       // Check if email already exists (except for the current user)
       const existingUser = allUsers.find((user) => user.email === editUserEmail && user.id !== editUserId)
@@ -213,11 +218,11 @@ export default function UsersPage() {
     }
   }
 
-  const handleDeleteUser = (userId: string) => {
+  const handleDeleteUser = async (userId: string) => {
     if (confirm("Tem certeza que deseja excluir este usuário?")) {
       try {
         // Get all users
-        const allUsers = getUsers()
+        const allUsers = await getUsers()
 
         // Filter out the user to delete
         const updatedUsers = allUsers.filter((user) => user.id !== userId)
@@ -774,4 +779,3 @@ export default function UsersPage() {
     </div>
   )
 }
-

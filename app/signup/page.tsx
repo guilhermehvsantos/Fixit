@@ -1,90 +1,131 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState, useEffect } from "react"
-import Link from "next/link"
-import Image from "next/image"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { AlertCircle } from "lucide-react"
-import { getCurrentUser, registerUser } from "@/app/lib/auth"
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { AlertCircle } from "lucide-react";
+import {
+  getCurrentUser,
+  registerUser,
+  initializeDefaultUsers,
+} from "@/app/lib/auth";
 
 export default function SignupPage() {
-  const [name, setName] = useState("")
-  const [email, setEmail] = useState("")
-  const [telephone, setTelephone] = useState("")
-  const [department, setDepartment] = useState("")
-  const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [agreeTerms, setAgreeTerms] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState("")
-  const router = useRouter()
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [telephone, setTelephone] = useState("");
+  const [department, setDepartment] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const router = useRouter();
+
+  localStorage.removeItem("fixit_current_user");
+  localStorage.removeItem("fixit_user_id");
 
   useEffect(() => {
-    // Check if user is already logged in
-    const user = getCurrentUser()
-    if (user) {
-      router.push("/dashboard")
-    }
-  }, [router])
+    // Initialize default users
+    initializeDefaultUsers();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+    // Check if user is already logged in
+    const user = getCurrentUser();
+    if (user) {
+      router.push("/dashboard");
+    }
+  }, [router]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
     if (!agreeTerms) {
-      setError("Você deve concordar com os termos de serviço para continuar.")
-      return
+      setError("Você deve concordar com os termos de serviço para continuar.");
+      return;
     }
 
     if (password !== confirmPassword) {
-      setError("As senhas não coincidem. Por favor, verifique e tente novamente.")
-      return
+      setError(
+        "As senhas não coincidem. Por favor, verifique e tente novamente."
+      );
+      return;
     }
 
     if (password.length < 8) {
-      setError("A senha deve ter pelo menos 8 caracteres.")
-      return
+      setError("A senha deve ter pelo menos 8 caracteres.");
+      return;
     }
 
-    setIsLoading(true)
-    setError("")
+    setIsLoading(true);
+    setError("");
 
     try {
-      registerUser({
+      await registerUser({
         name,
         email,
         telephone,
         department,
         password,
-      })
+      });
+
+      // Clear localStorage to prevent immediate redirection
+      localStorage.removeItem("fixit_current_user");
+      localStorage.removeItem("fixit_user_id");
 
       // Redirect to login page with success message
-      router.push("/login?registered=true")
+      router.push("/login?registered=true");
     } catch (error: any) {
-      setError(error.message || "Erro ao cadastrar. Tente novamente.")
-      setIsLoading(false)
+      if (error.message === "Failed to fetch") {
+        setError("Certifique a conexão com o servidor");
+      } else {
+        setError(error.message || "Erro ao cadastrar. Tente novamente.");
+      }
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
       <div className="container flex h-16 items-center py-4">
         <Link href="/" className="flex items-center gap-2">
-          <Image src="/placeholder.svg?height=32&width=32" alt="FixIt Logo" width={32} height={32} />
+          <Image
+            src="/images/LogoFixit.png"
+            alt="FixIt Logo"
+            width={32}
+            height={32}
+            className="rounded-sm"
+          />
           <span className="text-xl font-bold text-navy-700">FixIt</span>
         </Link>
       </div>
       <div className="flex flex-1 items-center justify-center px-4 py-12">
         <Card className="w-full max-w-md">
           <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold text-navy-900">Criar uma conta</CardTitle>
+            <CardTitle className="text-2xl font-bold text-navy-900">
+              Criar uma conta
+            </CardTitle>
             <CardDescription className="text-slate-600">
               Preencha as informações abaixo para se cadastrar
             </CardDescription>
@@ -131,7 +172,11 @@ export default function SignupPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="department">Departamento</Label>
-                <Select value={department} onValueChange={setDepartment} required>
+                <Select
+                  value={department}
+                  onValueChange={setDepartment}
+                  required
+                >
                   <SelectTrigger id="department">
                     <SelectValue placeholder="Selecione o departamento" />
                   </SelectTrigger>
@@ -155,7 +200,9 @@ export default function SignupPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                 />
-                <p className="text-xs text-slate-500">A senha deve ter pelo menos 8 caracteres</p>
+                <p className="text-xs text-slate-500">
+                  A senha deve ter pelo menos 8 caracteres
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirmar senha</Label>
@@ -172,20 +219,32 @@ export default function SignupPage() {
                 <Checkbox
                   id="terms"
                   checked={agreeTerms}
-                  onCheckedChange={(checked) => setAgreeTerms(checked as boolean)}
+                  onCheckedChange={(checked) =>
+                    setAgreeTerms(checked as boolean)
+                  }
                 />
-                <Label htmlFor="terms" className="text-sm font-normal leading-tight">
+                <Label
+                  htmlFor="terms"
+                  className="text-sm font-normal leading-tight"
+                >
                   Eu concordo com os{" "}
                   <Link href="/terms" className="text-navy-600 hover:underline">
                     Termos de Serviço
                   </Link>{" "}
                   e{" "}
-                  <Link href="/privacy" className="text-navy-600 hover:underline">
+                  <Link
+                    href="/privacy"
+                    className="text-navy-600 hover:underline"
+                  >
                     Política de Privacidade
                   </Link>
                 </Label>
               </div>
-              <Button type="submit" className="w-full bg-navy-600 hover:bg-navy-700 text-white" disabled={isLoading}>
+              <Button
+                type="submit"
+                className="w-full bg-navy-600 hover:bg-navy-700 text-white"
+                disabled={isLoading}
+              >
                 {isLoading ? "Cadastrando..." : "Criar conta"}
               </Button>
             </form>
@@ -206,6 +265,5 @@ export default function SignupPage() {
         </Card>
       </div>
     </div>
-  )
+  );
 }
-
